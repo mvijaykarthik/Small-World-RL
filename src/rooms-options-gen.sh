@@ -1,4 +1,5 @@
-PYTHON=python2
+#PYTHON=python2
+PYTHON=python
 ITERS=3
 EPOCHS="1e5 1e6 1e7"
 r=0.75
@@ -12,12 +13,13 @@ if [ ! -e $DD ]; then mkdir $DD; fi;
 for n in 100; do
   for scheme in "optimal-betweenness"; do
     echo "Building $n $scheme options..."
-    PYTHONOPTIMIZE=3 $PYTHON ./make_options.py $e $n "$scheme" "MacroQ" "Rooms:../domains/rooms1.txt" $tmp_prefix
+    #PYTHONOPTIMIZE=3 $PYTHON ./make_options.py $e $n "$scheme" "MacroQ" "Rooms:../domains/rooms1.txt" $tmp_prefix
+    $PYTHON ./make_options.py $e $n "$scheme" "MacroQ" "Rooms:../domains/rooms1.txt" $tmp_prefix
     mv "$tmp_prefix.options" "$DD/$scheme-$e.options"
   done;
   for scheme in "optimal-small-world"; do
     echo "Building $n $scheme(r=$r) options..."
-    PYTHONOPTIMIZE=3 $PYTHON ./make_options.py $e $n "$scheme:$r" "MacroQ" "Rooms:../domains/rooms1.txt" $tmp_prefix
+    $PYTHON ./make_options.py $e $n "$scheme:$r" "MacroQ" "Rooms:../domains/rooms1.txt" $tmp_prefix
     mv "$tmp_prefix.options" "$DD/$scheme-$e-$r.options"
   done;
 
@@ -25,12 +27,12 @@ for n in 100; do
     # Betweenness
     for scheme in "betweenness"; do
       echo "Building $n $scheme options..."
-      PYTHONOPTIMIZE=3 $PYTHON ./make_options.py $e $n "$scheme" "MacroQ" "Rooms:../domains/rooms1.txt" $tmp_prefix
+      $PYTHON ./make_options.py $e $n "$scheme" "MacroQ" "Rooms:../domains/rooms1.txt" $tmp_prefix
       mv "$tmp_prefix.options" "$DD/$scheme-$e.options"
     done;
     for scheme in "small-world"; do
       echo "Building $n $scheme(r=$r) options..."
-      PYTHONOPTIMIZE=3 $PYTHON ./make_options.py $e $n "$scheme:$r" "MacroQ" "Rooms:../domains/rooms1.txt" $tmp_prefix
+      $PYTHON ./make_options.py $e $n "$scheme:$r" "MacroQ" "Rooms:../domains/rooms1.txt" $tmp_prefix
       mv "$tmp_prefix.options" "$DD/$scheme-$e-$r.options"
     done;
   done;

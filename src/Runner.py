@@ -56,6 +56,7 @@ def run(env, agent, episodes):
             epochs = 0
             episode += 1 # Vikram
             r.append( ret ) # Vikram
+            ret = 0
 
 
 

@@ -41,7 +41,7 @@ def main( iterations, ensembles, episodes, agent_type, agent_args, env_type, env
         ret_ = np.zeros( episodes, dtype=float )
         # Initialise environment and agent
         for j in xrange( 1, ensembles+1 ):
-            print "iter, ens", i, j
+            #print "iter, ens", i, j
             agent = agent_type( env.Q, *agent_args )
             ret__ = Runner.run( env, agent, episodes )
             ret__ = np.cumsum( ret__ )

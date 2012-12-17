@@ -13,6 +13,7 @@ n=200
 for o in $OD/*.options; do
     scheme="load"
     echo "Running options from $o..."
-    PYTHONOPTIMIZE=3 python2 ./main.py $ITERS $ENSEMBLES $EPOCHS "MacroQ" "RoomsOptions:../domains/rooms1.txt:$scheme:$n:$o" $tmp_prefix
+    #PYTHONOPTIMIZE=3 python2 ./main.py $ITERS $ENSEMBLES $EPOCHS "MacroQ" "RoomsOptions:../domains/rooms1.txt:$scheme:$n:$o" $tmp_prefix
+    PYTHONOPTIMIZE=3 python ./main.py $ITERS $ENSEMBLES $EPOCHS "MacroQ" "RoomsOptions:../domains/rooms1.txt:$scheme:$n:$o" $tmp_prefix
     mv "$tmp_prefix-return.dat" $DD/$(basename $o .options).return
 done;
