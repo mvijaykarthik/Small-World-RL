@@ -32,7 +32,7 @@ def run(env, agent, episodes):
     episodic_return, episodic_epochs = [], []
     ret, epochs = 0, 0
 
-    #r = [] # Vikram
+    r = [] # Vikram
 
     episode = 0
     while episode < episodes:
@@ -49,16 +49,55 @@ def run(env, agent, episodes):
             ret += reward
             epochs += 1
 
-        #r.append( ret ) # Vikram
 
         if episode_ended:
             episodic_return.append( ret )
             episodic_epochs.append( epochs )
             epochs = 0
-            #episode += 1 # Vikram
+            episode += 1 # Vikram
+            r.append( ret ) # Vikram
 
 
 
     # Chop off any extras
-    return ret[ : epochs ]
-    #return r # Vikram
+    return r # Vikram
+    #return ret[ : epochs ]
+    
+# def run(env, agent, episodes):
+#     """ Simulate some episodes of running """
+# 
+#     state, reward, episode_ended = env.start(), 0, True
+# 
+#     episodic_return, episodic_epochs = [], []
+#     ret, epochs = 0, 0
+# 
+#     #r = [] # Vikram
+# 
+#     episode = 0
+#     while episode < episodes:
+#         action = agent.act(state, reward, episode_ended)
+#         state, reward, episode_ended = env.react(action)
+# 
+#         # Add rewards to ret
+#         if isinstance( action, Option ):
+#             # If this was an option, then multiple rewards would have been
+#             # returned.
+#             ret += sum( reward )
+#             epochs += len( state ) - 1
+#         else:
+#             ret += reward
+#             epochs += 1
+# 
+#         #r.append( ret ) # Vikram
+# 
+#         if episode_ended:
+#             episodic_return.append( ret )
+#             episodic_epochs.append( epochs )
+#             epochs = 0
+#             episode += 1 # Vikram
+# 
+# 
+# 
+#     # Chop off any extras
+#     return ret[ : epochs ]
+#     #return r # Vikram

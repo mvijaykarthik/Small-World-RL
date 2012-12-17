@@ -73,7 +73,7 @@ def main( iterations, ensembles, episodes, agent_type, agent_args, env_type, env
 
 def print_help(args):
     """Print help"""
-    print "Usage: %s <episodes> <episodes> <agent:args> <environment:args>" % (args[0])
+    print "Usage: %s <iterations> <ensembles> <episodes> <agent:args> <environment:args> <file_prefix>" % (args[0])
 
 def convert(arg):
     """Convert string arguments to numbers if possible"""
