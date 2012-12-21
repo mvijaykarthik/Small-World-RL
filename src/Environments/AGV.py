@@ -1,23 +1,18 @@
 """
 RL Framework
-Authors: Arun Chaganty, Prateek Gaur
-Taxi Environment
+Author: Vikram Rao
+AGV Environment
 """
 
 import numpy as np
 from Environment import *
 import functools 
 
-class Taxi():
+class AGV():
     """
-    Taxi Environment
-    Expects specification (size, endpoints, barriers) to be given
+    Simple AGV Environment
+    ?? Expects specification (size, endpoints, barriers) to be given
     """
-
-    NONE = 0
-    TOP_DOWN = 1
-    LEFT_RIGHT = 2 
-    STOP = 4
 
     MOVE_UP     = 0
     MOVE_DOWN   = 1
@@ -26,46 +21,43 @@ class Taxi():
     MOVE_PICK   = 4
     MOVE_DROP   = 5
 
-    ACCURACY = 0.8
+    @staticmethod
+    def state_idx( road_map, reward_success, holding, y, x, flipped ):
+        """Compute the index of the state
+        Holding - 1, 2, ... n_mach
+        """
+        n_mach = len(reward_success) + 1 # len number of items, plus none.
+        y_max, x_max= road_map.shape
 
-    REWARD_BIAS = -1
-    REWARD_FAILURE = -20 - REWARD_BIAS
-    REWARD_SUCCESS = 50 - REWARD_BIAS
-    REWARD_CHECKPOINT = 0 # - REWARD_BIAS
+        K = max( [ n_mach, y_max, x_max ] )
+
+        #if holding != 0 :
+        #    holding -= 1
+
+        idx = holding
+        idx = idx*K + y
+        idx = idx*K + x
+        idx = idx*K + int(flipped)
+
+        return idx
+        # x + K*y + K^2*holding
+        # raise NotImplemented()
 
     @staticmethod
-    def state_idx( road_map, starts, completed, in_taxi, pasn, dest, y, x ):
-        """Compute the index of the state"""
-
-        size = road_map.shape
-        STARTS = len( starts )
-        st, offset = x, size[1]
-        st, offset = st + offset * y, offset * size[0]
-        st, offset = st + offset * dest, offset * STARTS
-
-        if completed:
-            st = offset = offset * STARTS
-        elif in_taxi:
-            st, offset = st + offset * (STARTS-1), offset * STARTS
-        elif pasn < dest:
-            st, offset = st + offset * pasn, offset * STARTS
-        elif pasn > dest:
-            st, offset = st + offset * (pasn - 1), offset * STARTS
-        else:
-            raise ValueError()
-
-        return st
-
-    @staticmethod
-    def idx_state( road_map, st ):
+    def idx_state( road_map, reward_success, state ):
         """Compute the state for the index"""
-        x, state = state % size[1], state / size[1]
-        y, state = state % size[0], state / size[0]
-        dest, state = state % STARTS, state / STARTS
-        pasn, state = state % STARTS, state / STARTS
-        completed = bool( state )
+        n_mach = len(reward_success) + 1 # len number of items, plus none.
+        y_max, x_max= road_map.shape
 
-        return completed, in_taxi, pasn, dest, y, x
+        K = max( [ n_mach, y_max, x_max ] )
+
+        flipped, state = bool(state%K), state/K
+        x, state = state%K, state/K
+        y, state = state%K, state/K
+        holding, state = state%K, state/K
+
+        return holding, y, x, flipped
+        #raise NotImplemented()
 
     @staticmethod
     def make_map_from_size( height, width ):
@@ -84,103 +76,94 @@ class Taxi():
         if size != road_map.shape:
             raise ValueError()
 
-        starts = []
-        for y in xrange( size[0] ):
-            for x in xrange( size[1] ):
-                if road_map[ y, x ] & Taxi.STOP :
-                    starts.append( (y,x) )
+        g = np.max( road_map )
+        n_mach = (g-1)/2
 
-        return road_map, starts
+        reward_success = [ (m+1)*10 for m in range(n_mach) ]
+
+        return road_map, reward_success
 
     @staticmethod
-    def make_mdp( road_map, starts ):
+    def make_mdp( road_map, reward_success ):
         size = road_map.shape
-        STARTS = len( starts )
-        state_idx = functools.partial( Taxi.state_idx, road_map, starts )
+        n_mach = len(reward_success)
 
-        def make_map( road_map, in_taxi, pasn, dest, P ): 
-            state_idx_ = functools.partial( state_idx, False, in_taxi, pasn, dest )
+        def make_map( road_map, holding, P ): 
+            state_idx_ = functools.partial( AGV.state_idx, road_map, reward_success, holding )
+            state_idx__ = functools.partial( AGV.state_idx, road_map, reward_success )
 
-            def make_move( axis, y, x ):
-                ACCURACY = Taxi.ACCURACY
-                RESIDUE = 1.0 - ACCURACY
+            def make_move( road_map, axis, y, x ):
                 moves = []
 
-                if axis == Taxi.MOVE_UP:
-                    moves.append( (state_idx_( y-1, x ), ACCURACY) )
-                elif axis == Taxi.MOVE_DOWN:
-                    moves.append( (state_idx_( y+1, x ), ACCURACY) )
-                elif axis == Taxi.MOVE_LEFT:
-                    moves.append( (state_idx_( y, x-1 ), ACCURACY) )
-                elif axis == Taxi.MOVE_RIGHT:
-                    moves.append( (state_idx_( y, x+1 ), ACCURACY) )
-
-                if axis == Taxi.MOVE_UP or axis == Taxi.MOVE_DOWN:
-                    possibles = []
-                    if x > 0 and road_map[ y, x-1 ] & Taxi.LEFT_RIGHT == 0:
-                        possibles.append( state_idx_( y, x-1 ) )
-                    if x + 1 < size[1] and road_map[ y, x ] & Taxi.LEFT_RIGHT == 0:
-                        possibles.append( state_idx_( y, x+1 ) )
-                    if len( possibles ):
-                        moves += [ (s, RESIDUE / len( possibles ) ) for s in possibles ]
-                elif axis == Taxi.MOVE_LEFT or axis == Taxi.MOVE_RIGHT:
-                    possibles = []
-                    if y > 0 and road_map[ y-1, x ] & Taxi.TOP_DOWN == 0:
-                        possibles.append( state_idx_( y-1, x ) )
-                    if y + 1 < size[0] and road_map[ y, x ] & Taxi.TOP_DOWN == 0:
-                        possibles.append( state_idx_( y+1, x ) )
-                    if len( possibles ):
-                        moves += [ (s, RESIDUE / len( possibles ) ) for s in possibles ]
-
+                if axis == AGV.MOVE_UP:
+                    moves.append( (state_idx_( y-1, x, False ), 1.0) )
+                elif axis == AGV.MOVE_DOWN:
+                    moves.append( (state_idx_( y+1, x, False ), 1.0) )
+                elif axis == AGV.MOVE_LEFT:
+                    moves.append( (state_idx_( y, x-1, False ), 1.0) )
+                elif axis == AGV.MOVE_RIGHT:
+                    moves.append( (state_idx_( y, x+1, False ), 1.0) )
+                elif axis == AGV.MOVE_DROP:
+                    moves.append( (state_idx__( 0, y, x, True ), 1.0) )
+                elif axis == AGV.MOVE_PICK:
+                    moves.append( (state_idx__( road_map[y][x]/2, y, x, True ), 1.0) )
                 return moves
 
+            # Up, down, left and right. Pick and drop.
             for y in xrange( size[ 0 ] ):
                 for x in xrange( size[ 1 ] ):
-                    s = state_idx_( y, x )
-                    if y > 0 and road_map[ y-1, x ] & Taxi.TOP_DOWN == 0:
-                        P[ Taxi.MOVE_UP ][ s ] += make_move( 0, y, x )
-                    if y + 1 < size[0] and road_map[ y, x ] & Taxi.TOP_DOWN == 0:
-                        P[ Taxi.MOVE_DOWN ][ s ] += make_move( 1, y, x )
-                    if x > 0 and road_map[ y, x-1 ] & Taxi.LEFT_RIGHT == 0:
-                        P[ Taxi.MOVE_LEFT ][ s ] += make_move( 2, y, x )
-                    if x + 1 < size[1] and road_map[ y, x ] & Taxi.LEFT_RIGHT == 0:
-                        P[ Taxi.MOVE_RIGHT ][ s ] += make_move( 3, y, x )
+                    for flipped in [True, False] :
+                        s = state_idx_( y, x, flipped )
+                        if y > 0 and road_map[ y-1, x ] != 1:
+                            P[ AGV.MOVE_UP ][ s ] += make_move( road_map, AGV.MOVE_UP, y, x )
+                        if y + 1 < size[0] and road_map[ y, x ] != 1:
+                            P[ AGV.MOVE_DOWN ][ s ] += make_move( road_map, AGV.MOVE_DOWN, y, x )
+                        if x > 0 and road_map[ y, x-1 ] != 1:
+                            P[ AGV.MOVE_LEFT ][ s ] += make_move( road_map, AGV.MOVE_LEFT, y, x )
+                        if x + 1 < size[1] and road_map[ y, x ] != 1:
+                            P[ AGV.MOVE_RIGHT ][ s ] += make_move( road_map, AGV.MOVE_RIGHT, y, x )
+                        if road_map[y][x] not in [0, 1] and road_map[y][x]%2 == 0 and holding == 0 :
+                            #print 'Adding Pick', AGV.idx_state( road_map, reward_success, s )
+                            P[ AGV.MOVE_PICK ][ s ] += make_move( road_map, AGV.MOVE_PICK, y, x )
+                        if road_map[y][x] not in [0, 1] and road_map[y][x]%2 == 1 and 2*holding == road_map[y][x]-1 :
+                            #print 'Adding Drop', AGV.idx_state( road_map, reward_success, s )
+                            P[ AGV.MOVE_DROP ][ s ] += make_move( road_map, AGV.MOVE_DROP, y, x )
             return P
 
         # Create P, R
-        S = size[ 0 ] * size[ 1 ] * STARTS * STARTS + 1
+        K = max( size[0], size[1], n_mach )
+        S = K*K*K*K # how many states?
         A = 6 # up down left right pick drop
         P = [ [ [] for i in xrange( S ) ] for j in xrange( A ) ]
         R = {}
-        R_bias = Taxi.REWARD_BIAS
+        R_bias = 0# AGV.REWARD_BIAS
+        start_set = []
+        end_set = []
 
-        in_taxi = False
-        for pasn in xrange( STARTS ):
-            for dest in xrange( STARTS ):
-                if pasn == dest:
-                    continue
-                P = make_map( road_map, in_taxi, pasn, dest, P )
-                # Add pickup actions
-                y, x = starts[ pasn ]
-                s = state_idx( False, False, pasn, dest, y, x )
-                s_ = state_idx( False, True, pasn, dest, y, x )
-                P[ Taxi.MOVE_PICK ][ s ] += [ (s_, 1.0), ]
-                R[ (s, s_) ] = Taxi.REWARD_CHECKPOINT
+        P = make_map( road_map, 0, P )
+        for i in range(1, 1+n_mach ):
+            P = make_map( road_map, i, P )
 
-        in_taxi = True
-        pasn = -1 
-        for dest in xrange( STARTS ):
-            P = make_map( road_map, in_taxi, pasn, dest, P )
-            y, x = starts[ dest ]
-            s = state_idx( False, True, pasn, dest, y, x )
-            s_ = state_idx( True, True, pasn, dest, y, x )
-            P[ Taxi.MOVE_DROP ][ s ] += [ (s_, 1.0), ]
-            R[ (s, s_) ] = Taxi.REWARD_SUCCESS
+        # Add rewards for dropping parts to the correct drop-point.
+        for y in range( size[0] ):
+            for x in range( size[1] ):
+                if road_map[y][x] not in [0, 1] and road_map[y][x]%2 == 1:
+                    # state_idx( road_map, reward_success, holding, y, x ):
+                    item = (road_map[y][x] - 1)/2
+                    s = AGV.state_idx( road_map, reward_success, item, y, x, False )
+                    s_ = AGV.state_idx( road_map, reward_success, item, y, x, True )
+                    s__ = AGV.state_idx( road_map, reward_success, 0, y, x, True )
+                    R[ (s, s__) ] = reward_success[item-1]
+                    R[ (s_, s__) ] = reward_success[item-1]
+                    end_set.append(s__)
 
-        start_set = range( 
-                state_idx( False, False, 1, 0, y, x ),
-                state_idx( False, False, 2, 3, y, x ) + 1 )
-        end_set = [ state_idx( True, True, 0, 0, 0, 0 ) ]
+        for y in range( size[0] ):
+            for x in range( size[1] ):
+                start_set.append( AGV.state_idx( road_map, reward_success, 0, y, x, False ) )
+                start_set.append( AGV.state_idx( road_map, reward_success, 0, y, x, True ) )
+
+        #for e in end_set :
+        #    print AGV.idx_state(road_map, reward_success, e)
 
         return S, A, P, R, R_bias, start_set, end_set
 
@@ -188,10 +171,10 @@ class Taxi():
     def create( spec ):
         """Create a taxi from @spec"""
         if spec is None:
-            road_map, starts = Taxi.make_map_from_size( 5, 5 )
+            road_map, reward_success = AGV.make_map_from_size( 5, 5 )
         else:
-            road_map, starts = Taxi.make_map_from_file( spec )
-        return Environment( Taxi, *Taxi.make_mdp( road_map, starts ) )
+            road_map, reward_success = AGV.make_map_from_file( spec )
+        return Environment( AGV, *AGV.make_mdp( road_map, reward_success ) )
 
     @staticmethod
     def reset_rewards( env, *args ):
