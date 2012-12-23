@@ -10,6 +10,7 @@ import networkx as nx
 import util
 import sys
 import pdb
+import itertools
 
 from ProgressBar import ProgressBar
 
@@ -24,8 +25,8 @@ class Environment:
     Q = []
 
     state = 0
-
-    def __init__( self, domain, S, A, P, R, R_bias, start_set, end_set ):
+    # end_condition is a function to check if state is end state
+    def __init__( self, domain, S, A, P, R, R_bias, start_set, end_set, end_condition = None, road_map = None ):
         self.domain = domain
         self.S = S 
         self.A = A 
@@ -34,10 +35,17 @@ class Environment:
         self.R_bias = R_bias
         self.start_set = start_set
         self.end_set = end_set
-
+        self.end_condition = end_condition
+        self.road_map = road_map
         # State action set for MDP
         Q = []
+
+        # Allow xrange to support large integers
+        xrange = lambda stop: iter(itertools.count().next, stop)        
         for s in xrange(self.S):
+            for a in xrange(self.A):
+                if self.P[a][s] is None:
+                    print a, s
             Q.append( tuple( ( a for a in xrange( self.A ) if len( self.P[ a ][ s ] ) > 0 ) ) )
         self.Q = Q
 
@@ -67,7 +75,10 @@ class Environment:
         reward = self.R.get( (self.state, state), 0 ) + self.R_bias
 
         # If there is no way to get out of this state, the episode has ended
-        if self.end_set is not None:
+        if self.end_condition is not None:
+            # End Condition function
+            episode_ended = self.end_condition(state, road_map)
+        elif self.end_set is not None:
             episode_ended = state in self.end_set 
         else:
             episode_ended = len( self.Q[ state ] ) == 0
